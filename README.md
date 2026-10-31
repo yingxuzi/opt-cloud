@@ -9,7 +9,7 @@ Linux ARM64（甲骨文A1）或 x86_64/AMD64。与当前服务器版相同的家
 在新服务器执行（默认安装到 /opt/opt13）：
 
 ```bash
-curl -fL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh -o /tmp/opt13-install.sh && sudo bash /tmp/opt13-install.sh OWNER/REPO main
+curl -fL https://raw.githubusercontent.com/yingxuzi/opt-cloud/main/install.sh -o /tmp/opt13-install.sh && sudo bash /tmp/opt13-install.sh yingxuzi/opt-cloud main
 ```
 
 自动下载源码、按需安装 Docker、构建并启动容器、申请并续签 IP 证书。先放行 TCP 80、7777，两个端口需空闲。脚本不修改防火墙，不停止其他服务。
