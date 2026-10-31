@@ -1,0 +1,101 @@
+name: opt13
+x-logging: &logs
+  driver: json-file
+  options: {max-size: 10m, max-file: '3'}
+services:
+  certificates:
+    image: local/opt13-certificates:1.3.0
+    build: ./certificates
+    restart: unless-stopped
+    environment: {OPT_PUBLIC_IP: '${OPT_PUBLIC_IP:?Run deploy.sh first}'}
+    ports: ['80:80']
+    volumes: ['./data/acme:/etc/letsencrypt', './data/frontend:/data']
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ['no-new-privileges:true']
+    tmpfs: ['/tmp', '/var/log/letsencrypt', '/var/lib/letsencrypt', '/var/www/acme']
+    mem_limit: 256m
+    pids_limit: 64
+    logging: *logs
+    healthcheck:
+      test: [CMD, python, -c, "import json,time; b=json.load(open('/data/tls-bundle.json')); assert b['trustedIP'] and b['expiresAt']>time.time()*1000+3600000"]
+      interval: 15s
+      timeout: 5s
+      start_period: 5m
+      retries: 3
+  init:
+    image: local/opt13-frontend:1.3.0
+    build:
+      context: ./frontend
+      args: {OPT_ARCH: '${OPT_ARCH:-arm64}'}
+    command: [node, /app/bootstrap.cjs]
+    environment: {OPT_PUBLIC_IP: '${OPT_PUBLIC_IP}'}
+    volumes: ['./data/frontend:/data', './data/core:/core-data']
+    depends_on: {certificates: {condition: service_healthy}}
+    restart: 'no'
+    cap_drop: [ALL]
+    read_only: true
+    security_opt: ['no-new-privileges:true']
+    logging: *logs
+  core:
+    image: local/opt13-core:1.3.0
+    build: ./core
+    restart: unless-stopped
+    init: true
+    ports: ['7777:7777']
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN, NET_RAW, MKNOD]
+    device_cgroup_rules: ['c 10:200 rwm']
+    volumes: ['./data/core:/data']
+    environment:
+      VPNGATE_DATA_DIR: /data
+      DEPLOYMENT_MODE: docker
+      CHECK_INTERVAL_SECONDS: '900'
+      FETCH_INTERVAL_SECONDS: '900'
+      EXIT_SLOTS_CHECK_INTERVAL: '30'
+      MAX_EXIT_SLOTS: '100'
+      MULTI_EXIT_SLOTS: '100'
+      MAX_SCAN_ROWS: '300'
+      OPENVPN_TEST_CONCURRENCY: '4'
+      TARGET_VALID_NODES: '50'
+      TCP_PRESCREEN_CONCURRENCY: '20'
+      SLOT_EGRESS_CHECK_INTERVAL: '60'
+      SLOT_PROXY_HOST: 127.0.0.1
+      SLOT_TABLE_BASE: '1000'
+      UI_HOST: 127.0.0.1
+      UI_PORT: '8787'
+      LOCAL_PROXY_HOST: 127.0.0.1
+      LOCAL_PROXY_PORT: '7928'
+    mem_limit: 2g
+    pids_limit: 1024
+    security_opt: ['no-new-privileges:true']
+    logging: *logs
+    depends_on: {init: {condition: service_completed_successfully}}
+    healthcheck:
+      test: [CMD, python3, -c, "import socket; socket.create_connection(('127.0.0.1',8787),3).close()"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+  frontend:
+    image: local/opt13-frontend:1.3.0
+    build:
+      context: ./frontend
+      args: {OPT_ARCH: '${OPT_ARCH:-arm64}'}
+    restart: unless-stopped
+    network_mode: service:core
+    volumes: ['./data/frontend:/data', './data/core:/core-data:ro']
+    environment: {OPT_CORE_DIR: /core-data}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    tmpfs: ['/tmp:size=32m']
+    mem_limit: 512m
+    pids_limit: 256
+    logging: *logs
+    depends_on: {core: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:7777/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3

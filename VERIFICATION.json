@@ -1,0 +1,27 @@
+{
+  "version": "opt 1.3.0 standalone Docker",
+  "architectures": [
+    "arm64",
+    "amd64"
+  ],
+  "arm64ImageBuilds": [
+    "frontend",
+    "core",
+    "certificates"
+  ],
+  "amd64RuntimeTested": false,
+  "composeValidation": [
+    "arm64",
+    "amd64"
+  ],
+  "bootstrapTest": true,
+  "certificateRotationAndRejectionTest": true,
+  "occupiedPortProtection": true,
+  "productionServicesModified": false,
+  "newServerACMEIssuanceTested": false,
+  "credentialsIncluded": false,
+  "at": "2026-10-31T15:02:16.221Z",
+  "githubInstallerSyntaxChecked": true,
+  "githubFrontendArm64BuildPassed": true,
+  "githubPublished": false
+}
